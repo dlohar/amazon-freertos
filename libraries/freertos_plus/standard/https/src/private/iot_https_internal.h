@@ -228,6 +228,12 @@ typedef struct _httpsConnection
                                                             serving closed the connection on us because that error is unique to the underlying TLS layer. This is set
                                                             to false initially, set to true for a successful intentional call to connect, and then set to false only
                                                             after an explicit disconnect with a non-persistent request or a call to @ref https_client_function_disconnect. */
+    IotMutex_t reqQMutex;                       /**< @brief Mutex protecting operations on the request queue. */
+    struct _httpsRequest *pHeadReq;             /**< @brief The first item in the request queue is referenced here. */
+    struct _httpsRequest *pTailReq;             /**< @brief The last item in the request queue is referenced here. */
+    IotTaskPoolJobStorage_t taskPoolJobStorage; /**< @brief An asynchronous operation requires storage for the task pool job. */
+    IotTaskPoolJob_t taskPoolJob;               /**< @brief The task pool job identifier for an asynchronous request. */
+    IotSemaphore_t taskPoolJobSem;              /**< @brief Semaphore indicating that the taskpool job storage and job itself is ready to be scheduled. */
 } _httpsConnection_t;
 
 /**
@@ -255,6 +261,11 @@ typedef struct _httpsResponse
                                         On the following parser callback _httpParserOnHeaderValueCallback() we will store the value in pReadHeaderValue then exit the parsing. */
     struct _httpsConnection *pConnHandle;    /**< @brief Connection associated with response. This is set during IotHttpsClient_SendAsync() and IotHttpsClient_SendSync(). */
     struct _httpsRequest *pReqHandle;        /**< @brief Request associated with response. This is set during IotHttpsClient_InitializeRequest(). */
+    bool isAsync;           /**< @brief This is set to true if this response is currently being retrieved asynchronously. Set to false otherwise. */
+    uint8_t * pBodyStartInHeaderBuf;     /**< @brief Pointer to the start of body inside the header buffer for copying to copy to a body buffer provided later by the asyncrhonous response process. */
+    uint32_t bodyLengthInHeaderBuf;     /**< @brief Total length of the body pointed to by pBodyStartInHeaderBuf. */
+    IotHttpsReturnCode_t bodyRxStatus;  /**< @brief The status of the receiving the HTTPS body to be returned during the #IotHttpsClientCallbacks_t.readReadyCallback(). */
+    bool cancelled;         /**< @brief This is set to true in IotHttpsClient_CancelRequestAsync() to cancel the request/response processing in the asynchronous request workflow. */
 } _httpsResponse_t;
 
 /**
@@ -262,15 +273,19 @@ typedef struct _httpsResponse
  */
 typedef struct _httpsRequest
 {
-    uint8_t * pHeaders;      /**< @brief Pointer to the start of the headers buffer. */
-    uint8_t * pHeadersEnd;   /**< @brief Pointer to the end of the headers buffer. */
-    uint8_t * pHeadersCur;   /**< @brief Pointer to the next location to fill in the headers buffer. */
-    uint8_t * pBody;         /**< @brief Pointer to the start of the body buffer. */
+    uint8_t * pHeaders;     /**< @brief Pointer to the start of the headers buffer. */
+    uint8_t * pHeadersEnd;  /**< @brief Pointer to the end of the headers buffer. */
+    uint8_t * pHeadersCur;  /**< @brief Pointer to the next location to fill in the headers buffer. */
+    uint8_t * pBody;        /**< @brief Pointer to the start of the body buffer. */
     uint32_t bodyLength;    /**< @brief Length of request body buffer. */
     IotHttpsConnectionInfo_t* pConnInfo;    /**< @brief Connection info associated with this request. */
     struct _httpsResponse *pRespHandle;     /**< @brief Response associated with request. This is set during IotHttpsClient_InitializeRequest(). */
     struct _httpsConnection *pConnHandle;   /**< @brief Connection associated with request. This is set during IotHttpsClient_SendAsync() and IotHttpsClient_SendSync(). */
     uint32_t contentLength; /**< @brief The content length of the request body. */
+    void * pUserPrivData;                        /**< @brief User private data to hand back in the asynchronous callbacks for context in an asynchronous request. */
+    IotHttpsClientCallbacks_t* callbacks;   /**< @brief Pointer to the asynchronous request callbacks. */
+    bool cancelled;         /**< @brief Set this to true to cancel the request/response processing in the asynchronous workflow. */
+    struct _httpsRequest* pNextReq; /* @brief The next request to service asynchronously. */
 } _httpsRequest_t;
 
 #endif /* IOT_HTTPS_INTERNAL_H_ */

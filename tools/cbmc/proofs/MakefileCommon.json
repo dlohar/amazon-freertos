@@ -35,7 +35,7 @@
 	"$(FREERTOS)/libraries/3rdparty/http-parser",
 	"$(FREERTOS)/libraries/c_sdk/standard/serializer/src/cbor",
 	"$(FREERTOS)/libraries/c_sdk/aws/defender/include",
-	"$(FREERTOS)/tools/cbmc/include"
+	"$(FREERTOS)/tools/cbmc/include",
 	"$(FREERTOS)/libraries/c_sdk/standard/common/include/",
 	"$(FREERTOS)/libraries/abstractions/platform/include/",
 	"$(FREERTOS)/libraries/abstractions/platform/freertos/include/",
